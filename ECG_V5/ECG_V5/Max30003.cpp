@@ -5,7 +5,7 @@
 
 #define MAX30003_SPI_SPEED 3000000
 
-SPISettings SPI_SETTINGS(MAX30003_SPI_SPEED, MSBFIRST, SPI_MODE0); //
+SPISettings SPI_SETTINGS(MAX30003_SPI_SPEED, MSBFIRST, SPI_MODE0);  //
 
 // MAX30003::MAX30003(int cs_pin) {
 //   _cs_pin = cs_pin;
@@ -126,18 +126,23 @@ void MAX30003::max30003Begin() {
 
   // Cấu hình thanh ghi CNFG_GEN
   // Bật chức năng phát hiện lead-on và cài đặt ngưỡng phát hiện điện cực 0x802CB 0x8141B 0x8151B 0x8155B
-  max30003RegWrite(CNFG_GEN, 0x81B1B);  // Dòng điện DC Lead-Off: 20nA, ngưỡng phát hiện: VMID ± 300mV Bia 200M
+  max30003RegWrite(CNFG_GEN, 0x81A1B);  // Dòng điện DC Lead-Off: 10nA, ngưỡng phát hiện: VMID ± 300mV Bia 200M
   //0x81D53 50M  100nA 300mV
   //0x81D57 100M 100nA 300mV
-  //0x81D5B 200M 100nA 400mV   
+  //0x81D5B 200M 100nA 400mV
   //0x81D1B 200M 100nA 300mV
   // 0x81917 100M 5nA 300mV
-  //0x81B1B 200M 20nA  300mV
-  delay(100);
+  //0x81B1B 200M 20nA  300mV 0x81A1B
 
+  // 0x81A00 Non Bias
+  delay(100);
+  max30003RegWrite(MNGR_INT,0x780010);  
+  delay(100);
+  max30003RegWrite(MNGR_DYN, 0xBF0000);  
+  delay(100);
   // Cấu hình hiệu chuẩn (Calibration) CNFG_CAL
   // Cài đặt tín hiệu chuẩn để kiểm tra đường tín hiệu
-  // max30003RegWrite(CNFG_CAL, 0);  //   Calibration Source Magnitude Selection (VMAG)  = 0.50mV  || Calibration Source Frequency 256Hz
+  // max30003RegWrite(CNFG_CAL, 0x720000);  //   Calibration Source Magnitude Selection (VMAG)  = 0.50mV  || Calibration Source Frequency 256Hz
   // Cấu hình MUX đầu vào CNFG_EMUX 0x304800 0x700800 600800
   // Kết nối đường tín hiệu ECG vào ngõ vào MUX
   // delay(100);
@@ -150,9 +155,9 @@ void MAX30003::max30003Begin() {
   delay(100);
   // 512Hz, Gain=40, DLPF=40Hz, DHPF=0.5Hz //0x815000
   // Cấu hình CNFG_RTOR1
-  max30003RegWrite(CNFG_RTOR1, 0x3FA400);  //0x5FC600 0x3fc600 0x3FA300 
+  max30003RegWrite(CNFG_RTOR1, 0x3FB400);  //0x5FC600 0x3fc600 0x3FA300
   delay(100);
-  max30003RegWrite(EN_INT, 0x800403); // phát hiện sóng RR
+  max30003RegWrite(EN_INT, 0x800403);  // phát hiện sóng RR
   delay(100);
   max30003Synch();
   delay(100);

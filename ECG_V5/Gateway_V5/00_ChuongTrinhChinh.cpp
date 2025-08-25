@@ -6,6 +6,10 @@
 #include "06_Flags.h"
 #include "07_LoRa.h"
 
+
+
+
+#define debug
 _LoRa _LoRa_(CS_LoRa, RST_LoRa, INT_LoRa, EN_LoRa);
 WIFI _WiFi;
 Flags _Flags;                // Cờ định thời gian thực thi cách lệnh.

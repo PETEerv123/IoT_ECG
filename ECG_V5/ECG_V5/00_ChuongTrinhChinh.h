@@ -8,8 +8,8 @@
 
 
 #define PIN_BATTERY 4  // GPIO34 là chân ADC
-#define R1 220000.0    // 100k Ohm
-#define R2 100000.0    // 100k Ohm
+#define R1 220000.0    // 220000 Ohm
+#define R2 100000.0    // 100000 Ohm
 
 #define NutBoot 9
 #define CS_PIN_MAX30003 10  // Chân CS của MAX30003

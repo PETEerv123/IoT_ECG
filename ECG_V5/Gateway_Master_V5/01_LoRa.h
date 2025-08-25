@@ -20,6 +20,8 @@ class _LoRa{
     // bool DabatAP;
     unsigned int FREQ;
     _LoRa(int CS, int RST , int DIO0, int EN);
+    _LoRa(int CS, int RST , int DIO0);
+    _LoRa(int CS, int RST );
     void khoitao(Set_Region region, int syn);
     bool Enable();
     bool Disable();

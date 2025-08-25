@@ -6,6 +6,18 @@ _LoRa::_LoRa(int CS, int RST, int DIO0, int EN) {
   _DIO = DIO0;
   _EN = EN;
 }
+_LoRa::_LoRa(int CS, int RST , int DIO0){
+  _CS = CS;
+  _RST = RST;
+  _DIO = DIO0;
+  _EN = -1;
+}
+_LoRa::_LoRa(int CS, int RST ){
+  _CS = CS;
+  _RST = RST;
+  _DIO = -1;
+  _EN = -1;
+}
 void _LoRa::khoitao(Set_Region region, int syn) {  // int 4 byte
   LoRa.setPins(_CS, _RST, _DIO);
   pinMode(_EN, OUTPUT);

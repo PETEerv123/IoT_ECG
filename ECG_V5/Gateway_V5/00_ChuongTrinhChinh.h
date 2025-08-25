@@ -19,6 +19,14 @@
 #define RST_LoRa 22
 #define INT_LoRa 23 // chân Dio
 
+// #define SCK_LoRa   18
+// #define MISO_LoRa  19
+// #define MOSI_LoRa  23
+// #define CS_LoRa     5
+// #define RST_LoRa    4
+
+
+
 void KhoiTao(void);               
 void ChayChuongTrinhChinh(void);  
 

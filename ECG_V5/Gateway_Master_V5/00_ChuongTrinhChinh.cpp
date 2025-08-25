@@ -3,14 +3,15 @@
 #include "00_ChuongTrinhChinh.h"
 #include "01_LoRa.h"
 #include "02_POSTGET.h"
-
+#include "04_RTC.h"
 #include "05_WiFi.h"
 #include "06_Flags.h"
 
 
+// _LoRa _LoRa_(CS_LoRa, RST_LoRa);
 _LoRa _LoRa_(CS_LoRa, RST_LoRa, INT_LoRa, EN_LoRa);
 
-
+RTC _RTC;
 WIFI _WiFi;
 Flags _Flags;
 POSTGET _POSTGET;  // Các hàm thực thi POST - GET giữa device và serve.
@@ -27,8 +28,6 @@ typedef struct _ECGFIFO {
   char Mac[18];
   ECGFIFO FIFO;
 } _ECGFIFO;
-
-// static std::vector<ECGFIFO> ManagerBoard;
 TaskHandle_t HandleWireless;
 // Define Queue handle
 QueueHandle_t QueueHandle;
@@ -54,6 +53,28 @@ void HandleLoRaWiFi(void* pvParameters) {
       uint8_t buffer[sizeof(_ECGFIFO)];
       LoRa.readBytes(buffer, sizeof(_ECGFIFO));
       memcpy(&FIFO_RECEIVER, buffer, sizeof(_ECGFIFO));  // copy dữ liệu uint8_t sang dạng  mảng struct
+//       _RTC.LayRTCTuDS3231();                             // lấy dữ liệu từ DS3231
+//       String data = "{\"ID\":\"";
+//       data += String(FIFO_RECEIVER.Mac);
+//       data += "\",\"S\":";
+//       for (int i = 0; i < MaximumSample; ++i) {
+//         data += String(FIFO_RECEIVER.FIFO.EcgWave[i]);
+//         if (i < MaximumSample - 1) data += ",";
+//       }
+//       data += ";";
+//       data += String(FIFO_RECEIVER.FIFO.HR); // HEART RATE BPM
+//       data += ";";
+//       data += String(FIFO_RECEIVER.FIFO.RR); // khoảng sóng thời gian t RR
+//       data += ";";
+//       data += String(FIFO_RECEIVER.FIFO.Bat); // phần trăm Pin
+//       data += ";";
+//       data += String(_WiFi.TinhDoManhCuaWiFi());
+//       data += ";";
+//       data += _RTC.ChuanHoaChuoiRTCDeGuiVeServer();  // dữ liệu đã chuyển sang HH:mm:ss dd/MM/YYYY;
+//       data += "}";
+// #ifdef debug
+//       Serial.println(data);
+// #endif
       xQueueSend(QueueHandle, &FIFO_RECEIVER, 0);        // gửi qua Queue (giống như chuỗi vector nhưng nó bảo vệ dữ liệu tốt hơn)
     }
     // _Flags.TurnONFlags();
@@ -67,27 +88,26 @@ void Plotter(void* pvParameters) {
   for (;;) {
     if (xQueueReceive(QueueHandle, &Plotter, portMAX_DELAY) == pdPASS) {
       /*Bản Demo */
-            String data = "{\"Mac\":\"";
-            data += String(Plotter.Mac);
-            data += "\",\"ECGWave\":[";
-            for (int i = 0; i < MaximumSample; ++i) {
-              data += String(Plotter.FIFO.EcgWave[i]);
-              if (i < MaximumSample - 1) data += ",";
-            }
-
-            data += "],";
-            data += "\"HR\":";
-            data += String(Plotter.FIFO.HR);
-            data += ",\"RR\":";
-            data += String(Plotter.FIFO.RR);
-            data += ",\"BAT\":";
-            data += String(Plotter.FIFO.Bat);
-            data += ",\"Accel\":";
-            data += String(Plotter.FIFO.Accel);
-            data += "}";
-      #ifdef debug
-            Serial.println(data);
-      #endif
+      String data = "{\"Mac\":\"";
+      data += String(Plotter.Mac);
+      data += "\",\"ECGWave\":[";
+      for (int i = 0; i < MaximumSample; ++i) {
+        data += String(Plotter.FIFO.EcgWave[i]);
+        if (i < MaximumSample - 1) data += ",";
+      }
+      data += "],";
+      data += "\"HR\":";
+      data += String(Plotter.FIFO.HR);
+      data += ",\"RR\":";
+      data += String(Plotter.FIFO.RR);
+      data += ",\"BAT\":";
+      data += String(Plotter.FIFO.Bat);
+      data += ",\"Accel\":";
+      data += String(Plotter.FIFO.Accel);
+      data += "}";
+#ifdef debug
+      Serial.println(data);
+#endif
     }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -119,18 +139,21 @@ void KhoiTao(void) {
   //------ End: Khởi tạo để có thể cấu hình kết nối WiFi tự động -------//
   //======================================================================
   ID_Mac_Board = _WiFi.LaySoMAC();
+
   SPI.begin(SCK_LoRa, MISO_LoRa, MOSI_LoRa);  // cấu hình cho SPI để giao tiếp với LoRa
   _LoRa_.khoitao(Region_Assian, 0x23);        //khởi tạo LoRa // bat che do dong bo
-  LoRa.setSpreadingFactor(9);      // Cân bằng giữa tầm xa và tốc độ
-  LoRa.setSignalBandwidth(450E3);  // Băng thông cao hơn cho tốc độ nhanh
-  LoRa.setCodingRate4(5);          // Tỉ lệ mã hóa thấp hơn
-  LoRa.enableCrc();                // Bật kiểm tra CRC
+  LoRa.setSpreadingFactor(9);                 // Cân bằng giữa tầm xa và tốc độ
+  LoRa.setSignalBandwidth(450E3);             // Băng thông cao hơn cho tốc độ nhanh
+  LoRa.setCodingRate4(5);                     // Tỉ lệ mã hóa thấp hơn
+  LoRa.enableCrc();                           // Bật kiểm tra CRC
+
 #ifdef debug
   Serial.printf("LoRa initialized on frequency: %.1fMHz\n", _LoRa_.FREQ / 1000000.0);
   Serial.print("Gate way Mac : ");
   Serial.println(ID_Mac_Board);
   // Serial.print(_WiFi.DaBatAP);
 #endif
+  // _RTC.LayRTCTuServerCaiDatChoDS3231();  // cài đặt thời gian đã lấy từ sever cho Ds3231
 #pragma endregion Khởi tạo WIFI
   QueueHandle = xQueueCreate(QueueElementSize, sizeof(_ECGFIFO));
   xTaskCreatePinnedToCore(

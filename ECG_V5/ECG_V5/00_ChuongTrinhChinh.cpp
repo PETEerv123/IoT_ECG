@@ -19,27 +19,29 @@ ESPNOW _ESPNow;                        // Kết nối ESP-NOW giữa các ESP v�
 POSTGET _POSTGET;                      // Các hàm thực thi POST - GET giữa device và serve.
 ThongSoBoard _ThongSoBoard;            // Thông số cài đặt cho board lưu trong EEPROM.
 
-#define myEvent
-#define MacHandle
+// #define myEvent
+// #define MacHandle
 #define MaximumSample 50
 SemaphoreHandle_t EventHandle;
 
 struct ECGFIFO {
   int32_t EcgWave[MaximumSample];  // 4 byte * 50 // 200 byte
-  int16_t HR;       // 2 byte  0~256 bpm 
-  int16_t RR;       // 2 byte
-  int8_t Bat;       // 1 byte // mức độ pin tiêu thụ 0-100%
-  int8_t Accel;     // 1 byte ~~ 0-256 tính độ phần trăm té ngã 0-100%
+  int16_t HR;                      // 2 byte  0~256 bpm
+  int16_t RR;                      // 2 byte
+  int8_t Bat;                      // 1 byte // mức độ pin tiêu thụ 0-100%
+  int8_t Accel;                    // 1 byte ~~ 0-256 tính độ phần trăm té ngã 0-100%
 };
- 
 
 bool StatusConnection = false;
 String ID_Mac_Board;  // Số ID của ESP32, đây là số IMEI của board.
 uint8_t _GiuBootDePhatAP = 0;
 unsigned long long Esp32delaytime = 0;
-int delaytime = 2;
+int delaytime = 20;
 int8_t percBat, Final_VBat = 100;
 bool rtorIntrFlag = false;
+
+uint8_t i = 0;
+ECGFIFO FIFO;
 #ifdef MacHandle
 void _MacHandle(void* pvParameters) {
   for (;;) {
@@ -55,9 +57,9 @@ void _MacHandle(void* pvParameters) {
 #endif
 #ifdef myEvent
 void ECGTask(void* pvParameters) {
-  uint8_t i = 0;
+  // uint8_t i = 0;
   // uint32_t start = 0;
-  ECGFIFO FIFO;
+  // ECGFIFO FIFO;
   for (;;) {
     if (xSemaphoreTake(EventHandle, portMAX_DELAY) == pdPASS) {
       if (_WiFi.DaBatAP != 1) {
@@ -80,6 +82,7 @@ void ECGTask(void* pvParameters) {
           if (i >= MaximumSample) {
             // start = millis();
             esp_now_send(_ESPNow.MACMasterDungDinhDang, (uint8_t*)&FIFO, sizeof(ECGFIFO));
+
             i = 0;
           }
         }
@@ -89,17 +92,14 @@ void ECGTask(void* pvParameters) {
   }
 }
 #endif
-void rtorInterruptHndlr() {
 #ifdef myEvent
+void rtorInterruptHndlr() {
   // if (millis() - Esp32delaytime >= delaytime) {  // thêm cơ chế delay tránh cho chương trình nhảy vào Watchdog
   xSemaphoreGiveFromISR(EventHandle, NULL);  // giống lệnh XSemaphoreGive nhưng an toàn hơn giúp đảm bảo hàm ECGTask sẽ chạy tránh tình trạng nhảy vào watchdog
                                              // Esp32delaytime = millis();
   // }
-#endif
-#ifndef myEvent
-  rtorIntrFlag = true;
-#endif
 }
+#endif
 void KhoiTao() {
   Serial.begin(115200);
   analogReadResolution(12);
@@ -156,38 +156,41 @@ void KhoiTao() {
     0                                 /* pin task to core 0 */
   );
 #endif
+#ifdef myEvent
   attachInterrupt(digitalPinToInterrupt(INT), rtorInterruptHndlr, CHANGE);  // khởi tạo ngắt
-  // xSemaphoreGive(EventHandle);
-#ifdef debug
   Serial.print("Khởi tạo ngắt thành công");
 #endif
+  // xSemaphoreGive(EventHandle)
 }
 void ChayChuongTrinhChinh() {
 #ifndef myEvent
   if (_WiFi.DaBatAP != 1) {
-    // if (_max30003.STATUS_RR()) {                   // nếu phát hiện song R
-    // if (millis() - Esp32delaytime >= delaytime)  //test whether the period has elapsed
-    // {
-    if (rtorIntrFlag && _max30003.STATUS_RR() == 1) {
-      rtorIntrFlag = false;
-      // Esp32delaytime = millis();
-      // if (_max30003.STATUS_RR()) {
-      _max30003.Nhipdapbpm();
-      FIFO.EcgWave = int32_t(_max30003.EcgWave());
-      FIFO.HR = int16_t(_max30003.HR);
-      FIFO.RR = int16_t(_max30003.RR);
-      FIFO.Bat = percBat;
+    if (millis() - Esp32delaytime >= delaytime)  //test whether the period has elapsed
+    {
+      Esp32delaytime = millis();
+      if (_max30003.STATUS_RR()) {
+        _max30003.Nhipdapbpm();
+        FIFO.EcgWave[i] = int32_t(_max30003.EcgWave());
+        FIFO.HR = int16_t(_max30003.HR);
+        FIFO.RR = int16_t(_max30003.RR);
+        FIFO.Bat = percBat;
 #ifdef debug
-      Serial.println(_max30003.EcgWave());
+        Serial.println(_max30003.EcgWave());
 #endif
-      esp_now_send(_ESPNow.MACMasterDungDinhDang, (uint8_t*)&FIFO, sizeof(FIFO));
+        i++;
+        if (i >= MaximumSample) {
+          // start = millis();
+          if (_max30003.EcgWave() != 0) {
+            esp_now_send(_ESPNow.MACMasterDungDinhDang, (uint8_t*)&FIFO, sizeof(ECGFIFO));
+          }
+          i = 0;
+        }
+      }
     }
-    // }
-    // }
-    // _Flags.TurnONFlags();
-    // ThucThiTacVuTheoFLAG();
-    // _Flags.TurnOFFFlags();
   }
+  _Flags.TurnONFlags();
+  ThucThiTacVuTheoFLAG();
+  _Flags.TurnOFFFlags();
 #endif
 }
 void ThucThiTacVuTheoFLAG(void) {
@@ -200,6 +203,7 @@ void ThucThiTacVuTheoFLAG(void) {
       Serial.print("NHAN GIU LAN THU: ");
       Serial.println(_GiuBootDePhatAP);
     }
+    ReadBat();
   }
 #endif
 #pragma endregion Flag100ms
@@ -209,7 +213,6 @@ void ThucThiTacVuTheoFLAG(void) {
     if (_GiuBootDePhatAP > 10) {
       _WiFi.ThietLapAP();
     }
-    ReadBat();
   }
 #endif
 #pragma endregion Flag500ms
@@ -218,15 +221,19 @@ void ThucThiTacVuTheoFLAG(void) {
 #pragma region đọc điện áp Pin
 void ReadBat(void) {
   int adcValue = analogRead(PIN_BATTERY);
-  float voltage = adcValue * (3.3 / 4095.0);  // 3v3 đầu vào
+  float voltage = adcValue * (3 / 4095.0);  // 3v3 đầu vào
   // Tính VBAT dựa trên mạch chia áp
   float vbat = voltage * ((R1 + R2) / R2);
-  percBat = int8_t((vbat - 3.3) * 100.0 / (4.2 - 3.2));
-  if (percBat < Final_VBat && _max30003.EcgWave() != -655360) {  // nếu điện áp Pin lúc trước nhỏ hơn điện áp Pin lúc sau // ví dụ 59 > 60 // 655360 là giá trị DCLO tức kh có da dính vào 
-    Final_VBat = percBat;      // thì điện áp lúc sau sẽ bằng điện áp Pin lúc trước     // 60 = 59 ->  hiển thị 59
-  } else if (percBat > Final_VBat && _max30003.EcgWave() == -655360) {
-    Final_VBat = percBat;
+  percBat = int8_t((vbat - 3.22) * 100.0 / (4.22 - 3.22));
+  if (percBat < Final_VBat && percBat > 0) {  // nếu điện áp Pin lúc trước nhỏ hơn điện áp Pin lúc sau // ví dụ 59 > 60 // 655360 là giá trị DCLO tức kh có da dính vào
+    Final_VBat = percBat;                     // thì điện áp lúc sau sẽ bằng điện áp Pin lúc trước     // 60 = 59 ->  hiển thị 59
   }
+  // #ifdef debug
+  // Serial.println(Final_VBat);
+  // #endif
+  // else if (percBat > Final_VBat && _max30003.EcgWave() == -655360) {
+  //   Final_VBat = percBat;
+  // }
   // nếu điện áp Pin lúc trước lớn hơn điện áp Pin lúc sau  // ví dụ 60 > 59 // hiển thị 60 ,trong trường hợp sạc thì nó sẽ kiểm tra DCLOFF , nếu kh có DClOFF thì nó trong quá trình sạc
   percBat = constrain(Final_VBat, 0, 100);
 }

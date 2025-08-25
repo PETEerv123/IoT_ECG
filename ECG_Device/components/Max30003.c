@@ -170,6 +170,46 @@ signed long MAX30003_getEcgSamples(MAX30003_handle_t ctx)
     signed long ecgdata = (signed long)(data);
     return ecgdata;
 }
+Max30003_Info MAX30003_getHRandRR(MAX30003_handle_t ctx) {
+  Max30003_Info info;
+  uint8_t regReadBuff[4];
+  max30003RegRead(ctx,RTOR, regReadBuff);
+
+  unsigned long RTOR_msb = (unsigned long)(regReadBuff[1]);
+  unsigned char RTOR_lsb = (unsigned char)(regReadBuff[2]);
+  unsigned long rtor = (RTOR_msb << 8 | RTOR_lsb);
+  rtor = ((rtor >> 2) & 0x3fff);
+
+  info.heartRate = (unsigned int)(60 / ((float)rtor * 0.0078125));
+
+  info.RR = (unsigned int)rtor * (7.8125);  //8ms
+  return info;
+  // #ifndef DEBUG
+  //  Serial.println(heartRate);
+  // #endif
+}
+// Hàm attach interrupt cho MAX30003 với semaphore
+void max30003_attach_interrupt(MAX30003_handle_t ctx, gpio_isr_t isr_handler ) {
+    // Tạo binary semaphore
+    ctx->INTB2Bsem = xSemaphoreCreateBinary();
+
+    // Cấu hình chân INTB
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_NEGEDGE,   // INTB  cấu hình chân ở  trạng thái thay đổi
+        .pin_bit_mask = (1ULL << ctx->cfg.INT_pin),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&io_conf);
+    // Cài đặt ISR
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(ctx->cfg.INT_pin, isr_handler, NULL);
+}
+void Max30003_ISRgive(MAX30003_handle_t handle, BaseType_t *xHigherPriorityTaskWoken) {
+    if (handle && handle->INTB2Bsem) {// kiểm tra cấu trúc và INTB có phải null không ?
+        xSemaphoreGiveFromISR(handle->INTB2Bsem, xHigherPriorityTaskWoken);
+    }
+}
 #pragma endregion MAX30003
 
 #pragma region SPICLASS

@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "ECG_Device",
-    "project_version":    "1",
+    "project_version":    "8c13fbd-dirty",
     "project_path":       "G:/Project_A/Max3003/Tathuan_Project_ECG/ECG_V5/ECG_Device",
     "idf_path":           "C:/Users/TaThuan/esp/v5.4.1/esp-idf",
     "build_dir":          "G:/Project_A/Max3003/Tathuan_Project_ECG/ECG_V5/ECG_Device/build",
